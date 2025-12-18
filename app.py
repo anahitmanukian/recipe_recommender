@@ -142,7 +142,8 @@ def load_model():
     if not os.path.exists('recipe_recommender_large.pkl'):
         st.info("Downloading model (one-time, ~500MB)...")
         # Replace with your Google Drive file ID
-        url = 'https://drive.google.com/file/d/1nUIvqaKytaZpsLV9-QV3J9AHjRTjcAEM/view?usp=sharing'
+        file_id = '1nUIvqaKytaZpsLV9-QV3J9AHjRTjcAEM'
+        url = f'https://drive.google.com/uc?id={file_id}'
         gdown.download(url, 'recipe_recommender_large.pkl', quiet=False)
     
     with open('recipe_recommender_large.pkl', 'rb') as f:
