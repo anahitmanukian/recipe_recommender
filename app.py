@@ -138,30 +138,34 @@ st.markdown("""
 
 from scipy import sparse
 
-@st.cache_resource(show_spinner="Preparing the kitchen...")
+from scipy import sparse # Ensure this is at the top of app.py
+
+@st.cache_resource(show_spinner="Unlocking the recipe vault...")
 def load_model():
     from huggingface_hub import hf_hub_download
     import gc
+    import pandas as pd
 
-    # Define the 3 files to download
-    files = {
+    # Download filenames must match exactly what your script produced
+    file_names = {
         "df": "recipes_light.parquet",
         "matrix": "matrix_light.npz",
-        "vectorizer": "vectorizer_light.pkl"
+        "tfidf": "vectorizer_light.pkl"
     }
     
+    # Download from HF
     paths = {}
-    for key, filename in files.items():
+    for key, name in file_names.items():
         paths[key] = hf_hub_download(
             repo_id="anahitmanukyan/recipe_dataset",
-            filename=filename,
+            filename=name,
             repo_type="dataset"
         )
 
-    # Load them piece by piece
+    # Load with optimized memory usage
     df = pd.read_parquet(paths["df"])
     tfidf_matrix = sparse.load_npz(paths["matrix"])
-    with open(paths["vectorizer"], "rb") as f:
+    with open(paths["tfidf"], "rb") as f:
         tfidf = pickle.load(f)
 
     gc.collect()
