@@ -136,33 +136,36 @@ st.markdown("""
 # LOAD MODEL
 # ============================================
 
-@st.cache_resource(show_spinner=False)
+from scipy import sparse
+
+@st.cache_resource(show_spinner="Preparing the kitchen...")
 def load_model():
-    import os
-    import pickle
     from huggingface_hub import hf_hub_download
     import gc
 
-    # ✅ FIX: Use a writable cache directory for Streamlit Cloud
-    cache_dir = os.path.join(os.getcwd(), ".cache")
-    os.makedirs(cache_dir, exist_ok=True)
+    # Define the 3 files to download
+    files = {
+        "df": "recipes_light.parquet",
+        "matrix": "matrix_light.npz",
+        "vectorizer": "vectorizer_light.pkl"
+    }
     
-    model_file = hf_hub_download(
-        repo_id="anahitmanukyan/recipe_dataset",
-        filename="recipe_recommender_large.pkl",
-        repo_type="dataset",
-        cache_dir=cache_dir  # ✅ FIX: Specify writable cache location
-    )
+    paths = {}
+    for key, filename in files.items():
+        paths[key] = hf_hub_download(
+            repo_id="anahitmanukyan/recipe_dataset",
+            filename=filename,
+            repo_type="dataset"
+        )
 
-    st.success("✅ Model loaded")
+    # Load them piece by piece
+    df = pd.read_parquet(paths["df"])
+    tfidf_matrix = sparse.load_npz(paths["matrix"])
+    with open(paths["vectorizer"], "rb") as f:
+        tfidf = pickle.load(f)
 
-    with open(model_file, "rb") as f:
-        data = pickle.load(f)
-
-    # Explicit cleanup (important for Streamlit Cloud)
     gc.collect()
-
-    return data["df"], data["tfidf"], data["tfidf_matrix"]
+    return df, tfidf, tfidf_matrix
 
 # Load data
 df, tfidf, tfidf_matrix = load_model()

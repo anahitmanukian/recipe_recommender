@@ -1,3 +1,7 @@
 my_env
 main.py
 recipe_recommender_large.pkl
+files.py
+vectorizer_light.pkl
+recipes_light.parquet
+matrix_light.npz

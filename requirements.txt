@@ -4,3 +4,5 @@ scikit-learn
 numpy
 gdown
 huggingface_hub
+pyarrow
+fastparquet
