@@ -138,15 +138,27 @@ st.markdown("""
 
 @st.cache_resource
 def load_model():
-    # Check if model exists locally
-    if not os.path.exists('recipe_recommender_large.pkl'):
-        st.info("Downloading model (one-time, ~500MB)...")
-        # Replace with your Google Drive file ID
-        file_id = '1nUIvqaKytaZpsLV9-QV3J9AHjRTjcAEM'
-        url = f'https://drive.google.com/uc?id={file_id}'
-        gdown.download(url, 'recipe_recommender_large.pkl', quiet=False)
+    import os
+    from huggingface_hub import hf_hub_download
     
-    with open('recipe_recommender_large.pkl', 'rb') as f:
+    model_file = 'recipe_recommender_large.pkl'
+    
+    if not os.path.exists(model_file):
+        st.info("📥 Downloading recipe database from Hugging Face...")
+        try:
+            # Replace YOUR_USERNAME with your actual Hugging Face username
+            hf_hub_download(
+                repo_id="anahitmanukyan/recipe_dataset",
+                filename="recipe_recommender_large.pkl",
+                local_dir=".",
+                repo_type="dataset"
+            )
+            st.success("✅ Model downloaded!")
+        except Exception as e:
+            st.error(f"Error downloading: {e}")
+            st.stop()
+    
+    with open(model_file, 'rb') as f:
         data = pickle.load(f)
     return data['df'], data['tfidf'], data['tfidf_matrix']
 
