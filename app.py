@@ -136,31 +136,29 @@ st.markdown("""
 # LOAD MODEL
 # ============================================
 
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def load_model():
     import os
+    import pickle
     from huggingface_hub import hf_hub_download
-    
-    model_file = 'recipe_recommender_large.pkl'
-    
-    if not os.path.exists(model_file):
-        st.info("📥 Downloading recipe database from Hugging Face...")
-        try:
-            # Replace YOUR_USERNAME with your actual Hugging Face username
-            hf_hub_download(
-                repo_id="anahitmanukyan/recipe_dataset",
-                filename="recipe_recommender_large.pkl",
-                local_dir=".",
-                repo_type="dataset"
-            )
-            st.success("✅ Model downloaded!")
-        except Exception as e:
-            st.error(f"Error downloading: {e}")
-            st.stop()
-    
-    with open(model_file, 'rb') as f:
+    import gc
+
+    model_file = hf_hub_download(
+        repo_id="anahitmanukyan/recipe_dataset",
+        filename="recipe_recommender_large.pkl",
+        repo_type="dataset"
+    )
+
+    st.success("✅ Model loaded")
+
+    with open(model_file, "rb") as f:
         data = pickle.load(f)
-    return data['df'], data['tfidf'], data['tfidf_matrix']
+
+    # Explicit cleanup (important for Streamlit Cloud)
+    gc.collect()
+
+    return data["df"], data["tfidf"], data["tfidf_matrix"]
+
 
 # Load data
 df, tfidf, tfidf_matrix = load_model()
@@ -179,35 +177,60 @@ def search_recipes(query, n=50):
     results = df[mask].head(n)
     return results
 
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+
 def get_recommendations(recipe_name, n=10, min_similarity=0.1):
-    """Get recipe recommendations"""
     try:
         idx = df[df['title'].str.lower() == recipe_name.lower()].index[0]
+
         query_vec = tfidf_matrix[idx]
-        similarities = cosine_similarity(query_vec, tfidf_matrix).flatten()
-        
-        # Get top N (excluding the query recipe)
-        top_indices = np.argsort(-similarities)
-        top_indices = [i for i in top_indices 
-                      if i != idx and similarities[i] >= min_similarity][:n]
-        
-        results = df.iloc[top_indices][['title', 'ingredients', 'directions']].copy()
-        results['similarity_score'] = similarities[top_indices]
-        
+
+        # Compute similarities (sparse-safe)
+        similarities = cosine_similarity(query_vec, tfidf_matrix).ravel()
+
+        # Get top K candidates WITHOUT full sort
+        top_k = np.argpartition(similarities, -50)[-50:]
+
+        # Filter + sort only top candidates
+        filtered = [
+            i for i in top_k
+            if i != idx and similarities[i] >= min_similarity
+        ]
+
+        filtered = sorted(filtered, key=lambda i: similarities[i], reverse=True)[:n]
+
+        results = df.iloc[filtered][['title', 'ingredients', 'directions']].copy()
+        results['similarity_score'] = similarities[filtered]
+
         return results
+
     except IndexError:
         return None
 
-def recommend_by_ingredients(ingredients_list, n=15):
-    """Find recipes based on ingredients you have"""
+def recommend_by_ingredients(ingredients_list, n=15, min_similarity=0.05):
+    """Find recipes based on ingredients you have (cloud-safe)"""
+
     user_text = ' '.join(ingredients_list).lower()
     user_vec = tfidf.transform([user_text])
-    similarities = cosine_similarity(user_vec, tfidf_matrix).flatten()
-    
-    top_indices = np.argsort(-similarities)[:n]
-    results = df.iloc[top_indices][['title', 'ingredients', 'directions']].copy()
-    results['match_score'] = similarities[top_indices]
-    
+
+    # Compute similarities (1 × N, sparse-friendly)
+    similarities = cosine_similarity(user_vec, tfidf_matrix).ravel()
+
+    # Take only top-K candidates instead of sorting everything
+    top_k = np.argpartition(similarities, -100)[-100:]
+
+    # Filter + rank
+    filtered = [
+        i for i in top_k
+        if similarities[i] >= min_similarity
+    ]
+
+    filtered = sorted(filtered, key=lambda i: similarities[i], reverse=True)[:n]
+
+    results = df.iloc[filtered][['title', 'ingredients', 'directions']].copy()
+    results['match_score'] = similarities[filtered]
+
     return results
 
 def get_similarity_badge(score):
