@@ -143,10 +143,15 @@ def load_model():
     from huggingface_hub import hf_hub_download
     import gc
 
+    # ✅ FIX: Use a writable cache directory for Streamlit Cloud
+    cache_dir = os.path.join(os.getcwd(), ".cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    
     model_file = hf_hub_download(
         repo_id="anahitmanukyan/recipe_dataset",
         filename="recipe_recommender_large.pkl",
-        repo_type="dataset"
+        repo_type="dataset",
+        cache_dir=cache_dir  # ✅ FIX: Specify writable cache location
     )
 
     st.success("✅ Model loaded")
@@ -158,7 +163,6 @@ def load_model():
     gc.collect()
 
     return data["df"], data["tfidf"], data["tfidf_matrix"]
-
 
 # Load data
 df, tfidf, tfidf_matrix = load_model()
